@@ -23,6 +23,7 @@
     <junit-jupiter.version>5.4.0</junit-jupiter.version>
 
     <main.verticle>BookAuditWebServer.MainVerticle</main.verticle>
+    <slf4jVersion>1.6.1</slf4jVersion>
   </properties>
 
   <dependencyManagement>
@@ -50,6 +51,28 @@
       <groupId>io.vertx</groupId>
       <artifactId>vertx-auth-jdbc</artifactId>
     </dependency>
+    <dependency>
+      <groupId>io.vertx</groupId>
+      <artifactId>vertx-jdbc-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>${slf4jVersion}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>${slf4jVersion}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.vertx</groupId>
+      <artifactId>vertx-mysql-client</artifactId>
+      <version>3.8.3</version>
+    </dependency>
+
+
     <dependency>
       <groupId>io.vertx</groupId>
       <artifactId>vertx-junit5</artifactId>
