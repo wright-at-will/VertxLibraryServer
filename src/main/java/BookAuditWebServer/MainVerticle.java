@@ -47,19 +47,7 @@ public class MainVerticle extends AbstractVerticle {
       LOGGER.info("Client Failed to open");
     }
 
-      client.getConnection(ar -> {
-      if (ar.failed()) {
-        LOGGER.error("Could not open a database connection", ar.cause());
-        promise.fail(ar.cause());
-      } else {
-        SqlConnection connection = ar.result();
-        if (connection == null)
-          LOGGER.info("The connection could not be created");
-        else
-          connection.close();
-        promise.complete();
-      }
-    });
+      connect(client, promise);
     return promise.future();
   }
 
@@ -69,7 +57,7 @@ public class MainVerticle extends AbstractVerticle {
     Router router = Router.router(vertx);
     router.route("/").handler(this::login);
     router.route("/login").handler(this::login);
-    router.route("/test").handler(this::test);
+    router.route("/reports/bookdetail").handler(this::test);
 
     server.requestHandler(router)
       .listen(8888, http -> {
@@ -85,16 +73,27 @@ public class MainVerticle extends AbstractVerticle {
 
   private void login(RoutingContext context){
     LOGGER.info("I am sending a cookie back");
-    context.response().addCookie(Cookie.cookie("MyCookie","10").setMaxAge(60000000));
+    context.response().addCookie(Cookie.cookie("MyCookie","10").setMaxAge(10));
     context.response().end();
-    //context.response().setChunked(true);
-    //context.response().putHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
-    //context.response().putHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "GET");
-    //context.response().write("Cookie Stamped -> " + name + " : " +value);
-    //context.response().end();
-    //return context.addCookie(Cookie.cookie("NO!!MyCookie","0"));//context.user().setAuthProvider();
+    //TODO get DB connection and make a cookie with sessionToken = SHA2( CONCAT( NOW(), ‘my secret value’ ) , 256)
+   connect(client, Promise.promise());
   }
 
+  private void connect(MySQLPool client, Promise<Void> promise){
+    client.getConnection(ar -> {
+      if (ar.failed()) {
+        LOGGER.error("Could not open a database connection", ar.cause());
+        promise.fail(ar.cause());
+      } else {
+        SqlConnection connection = ar.result();
+        if (connection == null)
+          LOGGER.info("The connection could not be created");
+        else
+          connection.close();
+        promise.complete();
+      }
+    });.
+  }
   private void test(RoutingContext context){
     LOGGER.info("Do they have a cookie?");
     Cookie cookie;
