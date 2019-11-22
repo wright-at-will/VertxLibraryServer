@@ -57,7 +57,7 @@ public class MainVerticle extends AbstractVerticle {
     Router router = Router.router(vertx);
     router.route("/").handler(this::login);
     router.route("/login").handler(this::login);
-    router.route("/reports/bookdetail").handler(this::test);
+    router.route("/reports/bookdetail").handler(this::getBookReport);
 
     server.requestHandler(router)
       .listen(8888, http -> {
@@ -76,10 +76,10 @@ public class MainVerticle extends AbstractVerticle {
     context.response().addCookie(Cookie.cookie("MyCookie","10").setMaxAge(10));
     context.response().end();
     //TODO get DB connection and make a cookie with sessionToken = SHA2( CONCAT( NOW(), ‘my secret value’ ) , 256)
-   connect(client, Promise.promise());
+   connect(client, Promise.promise(), "SHA2( CONCAT( NOW(), ?),256");
   }
 
-  private void connect(MySQLPool client, Promise<Void> promise){
+  private void connect(MySQLPool client, Promise<Void> promise, String query){
     client.getConnection(ar -> {
       if (ar.failed()) {
         LOGGER.error("Could not open a database connection", ar.cause());
@@ -92,9 +92,10 @@ public class MainVerticle extends AbstractVerticle {
           connection.close();
         promise.complete();
       }
-    });.
+    });
   }
-  private void test(RoutingContext context){
+
+  private void getBookReport(RoutingContext context){
     LOGGER.info("Do they have a cookie?");
     Cookie cookie;
     try {
