@@ -82,7 +82,7 @@ public class MainVerticle extends AbstractVerticle {
     Promise<Void> promise = Promise.promise();
     HttpServer server = vertx.createHttpServer();
     Router router = Router.router(vertx);
-    router.route("/").handler(this::login);
+    router.route("/").handler(this::index);
     router.route("/login").handler(this::login);
     router.route("/reports/bookdetail").handler(this::getBookReport);
 
@@ -101,19 +101,10 @@ public class MainVerticle extends AbstractVerticle {
   private void login(RoutingContext context){
 	  HttpServerResponse loginResponse = context.response();
 	  connect(context, loginResponse);
-	  
-    //LOGGER.info("I am sending a cookie back");
-    //loginResponse.addCookie(Cookie.cookie("MyCookie","10").setMaxAge(10));
+
     loginResponse.end();
-    //TODO get DB connection and make a cookie with sessionToken = SHA2( CONCAT( NOW(), â€˜my secret valueâ€™ ) , 256)
-    //connect(client, Promise.promise(), "SHA2( CONCAT( NOW(), ?),256");
   }
   
-  private void index(RoutingContext context) {
-	  context.request().response().putHeader("content-type", "text/plain");
-	  context.request().response().end();
-  }
-
   private void connect(RoutingContext context, HttpServerResponse loginResponse) {
 	  String username = context.request().getParam("username");
 	  String hashedPassword = context.request().getParam("password");
@@ -136,7 +127,7 @@ public class MainVerticle extends AbstractVerticle {
         	
         	int userId = feedback.result().getRows().get(0).getInteger("id");
         	JsonArray createSessionParams = new JsonArray().add(userId);
-        	String createSessionQuery = "INSERT INTO session (user_id, token, expiration) VALUES (?, SHA2(UUID(), 256), DATE_ADD( NOW(), INTERVAL 1 MINUTE))";
+        	String createSessionQuery = "INSERT INTO session (user_id, token, expiration) VALUES (?, SHA2 ( CONCAT( NOW(), 'my secret value' ), 256), DATE_ADD( NOW(), INTERVAL 1 MINUTE))";
         	connection.updateWithParams(createSessionQuery, createSessionParams, resultHandler -> {
         		if (resultHandler.failed()) {
         			LOGGER.error("Failed to create a session with a valid user");
@@ -147,13 +138,20 @@ public class MainVerticle extends AbstractVerticle {
         		JsonArray getTokenParams = new JsonArray().add(newID);
         		String getTokenQuery = "SELECT token FROM session WHERE id=?";
         		connection.queryWithParams(getTokenQuery, getTokenParams, tokenHandler -> {
-        			String token = tokenHandler.result().getRows().get(0).getString("token");
-        			loginResponse.putHeader("Content-Type", "text/json");
+        			if (tokenHandler.failed()) {
+        				LOGGER.error("Could not retrieve token ", tokenHandler.cause());
+        				return401StatusCode(context);
+        			}       			
+        			String sessionID = tokenHandler.result().getRows().get(0).getString("token");
         			JsonObject JSON = new JsonObject();
+
         			JSON.put("response", "ok");
-        			JSON.put("session token", token);
+        			JSON.put("session token", sessionID);
+            		LOGGER.info("Session successfully created for user. ");
+
         			//close loginResponse
-        			loginResponse.end(JSON.toString());
+        			loginResponse.putHeader("Content-Type", "text/json");
+        			loginResponse.end(JSON.encodePrettily());
         					
         		});
         	});
@@ -162,6 +160,7 @@ public class MainVerticle extends AbstractVerticle {
   }
 
   private void getBookReport(RoutingContext context){
+	    LOGGER.info("Entered getBookReport ");
 	  String token = context.request().getHeader("Authorization").replace("Bearer ", "");
 	  HttpServerResponse serverResponse = context.response();
 	  
@@ -267,6 +266,16 @@ public class MainVerticle extends AbstractVerticle {
 				e.printStackTrace();
 		} 
 		
+  }
+  
+  private void index(RoutingContext context) {
+	  context.request().response().putHeader("Content-Type", "text/html");
+	  context.request().response().end("<H1>Welcome to Assignment 4</H1>\nUse extensions /login?username=bob&password=1234 or /reports/bookdetail");
+  }
+  
+  private void return401StatusCode(RoutingContext context) {
+	  context.response().setStatusCode(401);
+	  context.response().end();
   }
   
 }
