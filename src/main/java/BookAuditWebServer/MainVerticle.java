@@ -62,7 +62,7 @@ public class MainVerticle extends AbstractVerticle {
     Promise<Void> promise = Promise.promise();
     JsonObject connectOptions = new JsonObject()
       .put("host", "easel2.fulgentcorp.com")
-      .put("user", "yby805")
+      .put("username", "yby805")
       .put("password", "y9X8yYS2ZsFsuK1Xlzgj")
       .put("database", "yby805");
     
