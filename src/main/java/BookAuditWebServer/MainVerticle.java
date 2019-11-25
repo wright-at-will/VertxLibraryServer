@@ -136,7 +136,7 @@ public class MainVerticle extends AbstractVerticle {
         	
         	int userId = feedback.result().getRows().get(0).getInteger("id");
         	JsonArray createSessionParams = new JsonArray().add(userId);
-        	String createSessionQuery = "INSERT INTO session (user_id, token, expiration) VALUES (?, SHA2(UUID() 256), DATE_ADD( NOW(), INTERVAL 1 MINUTE))";
+        	String createSessionQuery = "INSERT INTO session (user_id, token, expiration) VALUES (?, SHA2(UUID(), 256), DATE_ADD( NOW(), INTERVAL 1 MINUTE))";
         	connection.updateWithParams(createSessionQuery, createSessionParams, resultHandler -> {
         		if (resultHandler.failed()) {
         			LOGGER.error("Failed to create a session with a valid user");
