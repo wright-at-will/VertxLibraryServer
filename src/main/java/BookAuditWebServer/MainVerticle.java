@@ -105,7 +105,7 @@ public class MainVerticle extends AbstractVerticle {
     //LOGGER.info("I am sending a cookie back");
     //loginResponse.addCookie(Cookie.cookie("MyCookie","10").setMaxAge(10));
     loginResponse.end();
-    //TODO get DB connection and make a cookie with sessionToken = SHA2( CONCAT( NOW(), ‘my secret value’ ) , 256)
+    //TODO get DB connection and make a cookie with sessionToken = SHA2( CONCAT( NOW(), â€˜my secret valueâ€™ ) , 256)
     //connect(client, Promise.promise(), "SHA2( CONCAT( NOW(), ?),256");
   }
   
@@ -136,7 +136,7 @@ public class MainVerticle extends AbstractVerticle {
         	
         	int userId = feedback.result().getRows().get(0).getInteger("id");
         	JsonArray createSessionParams = new JsonArray().add(userId);
-        	String createSessionQuery = "INSERT INTO session (user_id, token, expiration) VALUES (?, SHA2(UUID(), DATE_ADD( NOW(), INTERVAL 1 MINUTE))";
+        	String createSessionQuery = "INSERT INTO session (user_id, token, expiration) VALUES (?, SHA2(UUID() 256), DATE_ADD( NOW(), INTERVAL 1 MINUTE))";
         	connection.updateWithParams(createSessionQuery, createSessionParams, resultHandler -> {
         		if (resultHandler.failed()) {
         			LOGGER.error("Failed to create a session with a valid user");
@@ -175,8 +175,8 @@ public class MainVerticle extends AbstractVerticle {
 		  SQLConnection connection = ar.result();
 		  JsonArray verifyParamPermissions = new JsonArray();
 		  verifyParamPermissions.add(token);
-		  String verifyQueryPermissions = "SELECT allowed FROM session, permissions WHERE session.token=? "
-				  + "AND allowed=1 "
+		  String verifyQueryPermissions = "SELECT allowed_fields FROM session, permissions WHERE session.token=? "
+				  + "AND allowed_fields=1 "
 				  + "AND session.expiration > NOW() "
 				  + "AND session.user_id=permissions.user_id";
 		  connection.queryWithParams(verifyQueryPermissions, verifyParamPermissions, resultHandler -> {
@@ -188,9 +188,9 @@ public class MainVerticle extends AbstractVerticle {
 			  XSSFSheet sheet = workbook.createSheet("Book Report");
 			  addReportTitle(sheet, 0);
 			  String query = "SELECT title, publisher_name, year_published "
-					  + "FROM book, publisher "
-					  + "WHERE book.publisher_id=publisher.id "
-					  + "ORDER BY publisher.publisher_name, book.title";
+					  + "FROM Book, publisher "
+					  + "WHERE Book.publisher_id=publisher.id "
+					  + "ORDER BY publisher.publisher_name, Book.title";
 			  connection.query(query, excelQuery -> {
 				  addBookRecord(sheet, excelQuery.result().getRows(), 2);
 				  String fileName = "book_report.xlsx";
