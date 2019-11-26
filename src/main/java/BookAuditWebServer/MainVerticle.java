@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Set;
 
 import io.vertx.core.http.Cookie;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.CellType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.poi.ss.usermodel.Cell;
@@ -103,27 +105,6 @@ public class MainVerticle extends AbstractVerticle {
 	private void login(RoutingContext context) {
 		HttpServerResponse loginResponse = context.response();
 		connect(context, loginResponse);
-    /*client.getConnection(ar -> {
-      if(ar.failed()) {
-        LOGGER.error("Could not open a db connection", ar.cause());
-        loginResponse.end();
-        return;
-      }
-      SQLConnection connection = ar.result();
-      JsonArray userParams = new JsonArray();
-      connection.query("SELECT username, HEX(password) from user", feedback -> {
-        List<JsonArray> row = feedback.result().getResults();
-        if(row.size()<1) {
-          LOGGER.error("Command failed");
-          connection.close();
-          return401StatusCode(context);
-        }
-        for(JsonArray jsa: row){
-          LOGGER.info(jsa.toString());
-        }
-      });
-    });*/
-		//loginResponse.end();
 	}
 
 	private void connect(RoutingContext context, HttpServerResponse loginResponse) {
@@ -180,28 +161,6 @@ public class MainVerticle extends AbstractVerticle {
 		});
 	}
 
-	private void generateJSON(RoutingContext context, HttpServerResponse loginResponse, String username,
-			SQLConnection connection, AsyncResult<JsonArray> tokenHandler) {
-		LOGGER.info("Entering generateToken: Closed connection");
-		connection.close();
-		if (tokenHandler.failed()) {
-			LOGGER.error("Could not retrieve token ", tokenHandler.cause());
-			return401StatusCode(context);
-		}
-
-		JsonArray sessionID = tokenHandler.result();
-		JsonObject JSON = new JsonObject();
-		if (sessionID.size() > 0) {
-			JSON.put("response", "ok");
-			JSON.put("session token", sessionID);
-			LOGGER.info("Session successfully created for " + username);
-			loginResponse.putHeader("Content-Type", "text/json");
-			loginResponse.end(JSON.encodePrettily());
-		} else {
-			loginResponse.putHeader("Content-Type", "text/html");
-			loginResponse.end("Something went wrong when attempting to show token JSON");
-		}
-	}
 //INFO Route controller for "/reports/bookdetail
 	private void getBookReport(RoutingContext context) {
 		HttpServerResponse serverResponse = context.response();
@@ -210,7 +169,6 @@ public class MainVerticle extends AbstractVerticle {
 		try {
 			// "Bearer "
 			bearerToken = context.getCookie("SessionCookie").getValue();
-      //bearerToken = context.request().getHeader("Authorization").substring(7);
 		} catch (Exception e) {
 			return401StatusCode(context);
 		}
@@ -228,21 +186,35 @@ public class MainVerticle extends AbstractVerticle {
 			 * "SELECT allowed_fields FROM session, permissions WHERE session.token=? " +
 			 * "AND allowed_fields=1 " + "AND session.expiration > NOW() " +
 			 * "AND session.user_id=permissions.user_id"
+			 *
+			 *
+			 * "SELECT allowed_fields FROM permissions" +
+			 * "WHERE permission="book_report" +
+			 * "AND user_id in (SELECT user_id from session " +
+			 * "WHERE token=UNHEX(?) " +
+			 * "AND expiration > NOW())"
 			 */
-			connection.querySingleWithParams("SELECT * FROM session WHERE expiration > now() and token=UNHEX(?)", token,
+			String permissionQuery =
+        "SELECT allowed_fields FROM permissions " +
+          "WHERE permission=\"book report\" " +
+          "AND user_id in (SELECT user_id FROM session " +
+          "WHERE token=UNHEX(?) " +
+          "AND expiration > NOW()) ";
+			connection.querySingleWithParams(permissionQuery, token,
 					resultHandler -> {
 						if (resultHandler.failed()) {
 							LOGGER.error("Select query failed", resultHandler.cause());
 							connection.close();
 							return401StatusCode(context);
 							return;
-						} else {
-							if (resultHandler.result() == null) {
+						}
+							if (resultHandler.result() == null || !resultHandler.result().getList().get(0).toString().equals("1")) {
 								LOGGER.error("Not a valid token found. ");
 								connection.close();
 								return401StatusCode(context);
 								return;
-							}
+              }
+
 
 							XSSFWorkbook workbook = new XSSFWorkbook();
 							XSSFSheet sheet = workbook.createSheet("Book Report");
@@ -252,10 +224,9 @@ public class MainVerticle extends AbstractVerticle {
 											+ "WHERE Book.publisher_id=publisher.id "
 											+ "ORDER BY publisher.publisher_name, Book.title",
 									excelQuery -> createExcelSheet(workbook, sheet, serverResponse, excelQuery));
-						}
+						});
 					});
-		});
-	}
+		}
 
 	private void createExcelSheet(XSSFWorkbook workbook, XSSFSheet sheet, HttpServerResponse serverResponse,
 			AsyncResult<ResultSet> excelQuery) {
@@ -285,8 +256,8 @@ public class MainVerticle extends AbstractVerticle {
 	private void addBookHeaders(XSSFSheet sheet, int startRow) {
 		XSSFRow row = sheet.createRow(startRow);
 		row.createCell(0).setCellValue("Book Title");
-		row.createCell(0).setCellValue("Publisher");
-		row.createCell(0).setCellValue("Year Published");
+		row.createCell(1).setCellValue("Publisher");
+		row.createCell(2).setCellValue("Year Published");
 	}
 
 	private void addBooks(XSSFSheet sheet, List<JsonObject> records, int startRow) {
@@ -298,8 +269,8 @@ public class MainVerticle extends AbstractVerticle {
 
 			XSSFRow nextRow = sheet.createRow(currentRow);
 			nextRow.createCell(0).setCellValue(title);
-			nextRow.createCell(0).setCellValue(publisherName);
-			nextRow.createCell(0).setCellValue(yearPublished);
+			nextRow.createCell(1).setCellValue(publisherName);
+			nextRow.createCell(2).setCellValue(yearPublished);
 			currentRow++;
 		}
 	}
