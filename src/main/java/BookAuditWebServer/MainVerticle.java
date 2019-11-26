@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import io.vertx.core.http.Cookie;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.poi.ss.usermodel.Cell;
@@ -91,11 +92,38 @@ public class MainVerticle extends AbstractVerticle {
 		return promise.future();
 	}
 
+  //INFO Route Controller for "/"
+  private void index(RoutingContext context) {
+    context.request().response().putHeader("Content-Type", "text/html");
+    context.request().response().end(
+      "<H1>Welcome to Assignment 4</H1>\nUse extensions /login?username=bob&password=1234 or /reports/bookdetail");
+  }
+
+  //INFO Route controller for "/login"
 	private void login(RoutingContext context) {
 		HttpServerResponse loginResponse = context.response();
 		connect(context, loginResponse);
-
-		loginResponse.end();
+    /*client.getConnection(ar -> {
+      if(ar.failed()) {
+        LOGGER.error("Could not open a db connection", ar.cause());
+        loginResponse.end();
+        return;
+      }
+      SQLConnection connection = ar.result();
+      JsonArray userParams = new JsonArray();
+      connection.query("SELECT username, HEX(password) from user", feedback -> {
+        List<JsonArray> row = feedback.result().getResults();
+        if(row.size()<1) {
+          LOGGER.error("Command failed");
+          connection.close();
+          return401StatusCode(context);
+        }
+        for(JsonArray jsa: row){
+          LOGGER.info(jsa.toString());
+        }
+      });
+    });*/
+		//loginResponse.end();
 	}
 
 	private void connect(RoutingContext context, HttpServerResponse loginResponse) {
@@ -111,7 +139,7 @@ public class MainVerticle extends AbstractVerticle {
 			SQLConnection connection = ar.result();
 			JsonArray userParams = new JsonArray();
 			userParams.add(username).add(hashedPassword);
-			connection.queryWithParams("SELECT * FROM user WHERE username=? and password=?", userParams, feedback -> {
+			connection.queryWithParams("SELECT * FROM user WHERE username=? and password=UNHEX(?)", userParams, feedback -> {
 				List<JsonArray> row = feedback.result().getResults();
 				if (row.size() < 1) {
 					LOGGER.error("Could not find " + username + " in our DB");
@@ -125,7 +153,7 @@ public class MainVerticle extends AbstractVerticle {
 				createSessionParams.add(row.get(0).getString(1));
 				connection.updateWithParams(
 						"INSERT INTO session (user_id, token, expiration) "
-								+ "VALUES (?, SHA2 ( CONCAT( NOW(), ? ), 256), DATE_ADD( NOW(), INTERVAL 1 MINUTE))",
+								+ "VALUES (?, UNHEX(SHA2 ( CONCAT( NOW(), ? ), 256)), DATE_ADD( NOW(), INTERVAL 1 MINUTE))",
 						createSessionParams, resultHandler -> {
 							if (resultHandler.failed()) {
 								LOGGER.error("Failed to create a session with a valid username and password: "
@@ -133,12 +161,21 @@ public class MainVerticle extends AbstractVerticle {
 								loginResponse.end("Error creating session");
 								return;
 							}
+							LOGGER.info("token received");
 
-							JsonArray getTokenParams = resultHandler.result().getKeys();
-							connection.querySingleWithParams("SELECT * FROM session WHERE id=?", getTokenParams,
-									tokenHandler -> generateJSON(context, loginResponse, username, connection,
-											tokenHandler));
+							//JsonArray getTokenParams = resultHandler.result().getKeys();
+							connection.querySingle(" select HEX(token) from session where id=(SELECT LAST_INSERT_ID());",
+									tokenHandler -> {
+							  if(tokenHandler.failed())
+							    LOGGER.error("Did not get token");
+							  loginResponse
+                  .addCookie(Cookie.cookie("SessionCookie",tokenHandler.result().getString(0)).setMaxAge(1000))
+                  .end("Your sessionCookie should have: "+tokenHandler.result().getString(0));
+							  return;
+							});
 						});
+				connection.close();
+				//loginResponse.end();
 			});
 		});
 	}
@@ -165,7 +202,7 @@ public class MainVerticle extends AbstractVerticle {
 			loginResponse.end("Something went wrong when attempting to show token JSON");
 		}
 	}
-
+//INFO Route controller for "/reports/bookdetail
 	private void getBookReport(RoutingContext context) {
 		HttpServerResponse serverResponse = context.response();
 		LOGGER.info("Entered getBookReport ");
@@ -191,7 +228,7 @@ public class MainVerticle extends AbstractVerticle {
 			 * "AND allowed_fields=1 " + "AND session.expiration > NOW() " +
 			 * "AND session.user_id=permissions.user_id"
 			 */
-			connection.querySingleWithParams("SELECT * FROM session WHERE expiration > now() and token=?", token,
+			connection.querySingleWithParams("SELECT * FROM session WHERE expiration > now() and token=UNHEX(?)", token,
 					resultHandler -> {
 						if (resultHandler.failed()) {
 							LOGGER.error("Select query failed", resultHandler.cause());
@@ -294,11 +331,6 @@ public class MainVerticle extends AbstractVerticle {
 
 	}
 
-	private void index(RoutingContext context) {
-		context.request().response().putHeader("Content-Type", "text/html");
-		context.request().response().end(
-				"<H1>Welcome to Assignment 4</H1>\nUse extensions /login?username=bob&password=1234 or /reports/bookdetail");
-	}
 
 	private void return401StatusCode(RoutingContext context) {
 		context.response().setStatusCode(401);
