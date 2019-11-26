@@ -209,7 +209,8 @@ public class MainVerticle extends AbstractVerticle {
 		String bearerToken = null;
 		try {
 			// "Bearer "
-			bearerToken = context.request().getHeader("Authorization").substring(7);
+			bearerToken = context.getCookie("SessionCookie").getValue();
+      //bearerToken = context.request().getHeader("Authorization").substring(7);
 		} catch (Exception e) {
 			return401StatusCode(context);
 		}
